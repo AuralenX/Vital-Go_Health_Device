@@ -79,7 +79,7 @@ void drawVitalsPage2() {
   display.print(bloodPressureSystolic);
   display.setCursor(80, 18);
   display.print("/");
-  display.setCursor(85, 18);
+  display.setCursor(88, 18);
   display.print(bloodPressureDiastolic);
   display.setCursor(100, 18);
   display.print("mmHg");

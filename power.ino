@@ -113,7 +113,7 @@ void drawPowerOffAnimation() {
     
     display.setTextSize(1);
     display.setTextColor(SSD1306_WHITE);
-    display.setCursor(20, 50);
+    display.setCursor(30, 50);
     display.print("POWERING OFF");
     
     display.display();
@@ -135,7 +135,7 @@ void drawPowerOffScreen() {
   display.setTextColor(SSD1306_WHITE);
   display.setCursor(30, 45);
   display.print("SYSTEM OFF");
-  display.setCursor(15, 55);
+  display.setCursor(5, 55);
   display.print("Hold 5s to power on");
 }
 
