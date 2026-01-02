@@ -147,18 +147,26 @@ const unsigned char epd_bitmap_vitalgo_qrcode [] PROGMEM = {
 #define MOTION_READ_INTERVAL 100  
 
 // Fall detection thresholds for wearable
-#define FALL_IMPACT_THRESHOLD 18.0    
-#define FREE_FALL_THRESHOLD_LOW 10 
-#define FREE_FALL_THRESHOLD_HIGH 15
+#define FALL_IMPACT_THRESHOLD 6.0    
+#define FREE_FALL_THRESHOLD_LOW 0.1 
+#define FREE_FALL_THRESHOLD_HIGH 0.5
+#define FALL_STILLNESS_THRESHOLD 0.3
 #define MIN_FREE_FALL_TIME 300        
 #define POST_FALL_STILL_TIME 8000
 
+// Motion sensitivity
+#define WRIST_SHAKE_THRESHOLD 3.0     
+#define INTENTIONAL_MOVEMENT_THRESHOLD 0.5
+
 // Sensor thresholds and constants
-#define ACCEL_THRESHOLD 1.5
-#define STEP_DEBOUNCE 600
-#define FALL_STILLNESS_THRESHOLD 0.5
+#define ACCEL_THRESHOLD 0.8
+#define STEP_DEBOUNCE 400
 #define RESP_RATE_MIN 8
 #define RESP_RATE_MAX 30
+#define RESP_PPG_SAMPLE_RATE 25
+#define RESP_PPG_WINDOW_SIZE 100
+#define RESP_PPG_UPDATE_INTERVAL 10000
+#define RESP_PPG_SIGNAL_THRESHOLD 30000
 
 // I2C speed constants
 #define I2C_SPEED_STANDARD 100000
@@ -173,6 +181,15 @@ enum PageState {
   PAGE_ABOUT,
   PAGE_QR_CODE,
   PAGE_COUNT
+};
+
+// Activity states enum (for MPU6050)
+enum ActivityState {
+  ACTIVITY_IDLE,
+  ACTIVITY_WALKING,
+  ACTIVITY_RUNNING,
+  ACTIVITY_SHAKING,
+  ACTIVITY_UNKNOWN
 };
 
 #endif

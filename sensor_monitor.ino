@@ -48,7 +48,6 @@ void updateSensorData() {
 
 // Calculate derived vitals
 void calculateDerivedVitals() {
-  // Update body temperature (already done in bmp280_sensor.ino)
   
   // Estimate sleep quality
   static int movementCount = 0;
@@ -127,11 +126,13 @@ void checkVitalAlerts() {
     }
   }
   
-  // Respiratory rate alerts
-  if (mpu6050Detected && respiratoryRate > 0) {
+  // Respiratory rate alerts (now from PPG)
+  if (max30102Detected && respiratoryRate > 0) {
     if (respiratoryRate > RESP_RATE_MAX || respiratoryRate < RESP_RATE_MIN) {
       criticalAlert = true;
       alertMessage = "CRITICAL Resp Rate: " + String(respiratoryRate) + " BPM";
+      Serial.print("[ALERT] Respiratory rate alert from PPG: ");
+      Serial.println(respiratoryRate);
     }
   }
   

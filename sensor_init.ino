@@ -62,6 +62,7 @@ void initSensors() {
   
   if (mpuError == 0 && mpu.begin(MPU6050_ADDRESS)) {
     mpu6050Detected = true;
+    setupMPU6050(); 
     mpu.setAccelerometerRange(MPU6050_RANGE_2_G);
     mpu.setGyroRange(MPU6050_RANGE_250_DEG);
     mpu.setFilterBandwidth(MPU6050_BAND_21_HZ);
