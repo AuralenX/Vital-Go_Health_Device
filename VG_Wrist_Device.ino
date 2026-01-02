@@ -1,4 +1,4 @@
-// Main Arduino sketch
+// VG_Wrist_Device.ino - MAIN FILE
 #include <Wire.h>
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
@@ -7,7 +7,7 @@
 // Global OLED object
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 
-// ========== POWER & SYSTEM VARIABLES ==========
+// ========== EXTERN VARIABLES (declared in sensor_globals.ino) ==========
 extern bool powerState;
 extern bool sosActive;
 extern bool showingLogo;
@@ -16,60 +16,11 @@ extern unsigned long logoStartTime;
 extern unsigned long pageTimer;
 extern unsigned long lastActivityTime;
 extern unsigned long sosStartTime;
-
-// ========== SENSOR DETECTION VARIABLES ==========
-extern bool bmp280Detected;
-extern bool mpu6050Detected;
-extern bool max30102Detected;
-
-// ========== VITAL SIGNS DATA ==========
-extern int heartRate;
-extern int bloodOxygen;
-extern float bodyTemperature;
-extern float ambientTemperature;
-extern int bloodPressureSystolic;
-extern int bloodPressureDiastolic;
-extern int respiratoryRate;
-extern int sleepQuality;
-extern int stepsToday;
-extern int batteryLevel;
-extern int signalStrength;
-
-// ========== MOTION SENSOR VARIABLES ==========
-extern int stepCount;
-extern float lastAccelX, lastAccelY, lastAccelZ;
-extern unsigned long lastStepTime;
-
-// ========== HEART RATE SENSOR VARIABLES ==========
-extern long irValue;
-extern float beatsPerMinute;
-extern int beatAvg;
-extern byte rateSpot;
-extern long lastBeat;
-
-// ========== TIMING VARIABLES ==========
-extern unsigned long lastHRRead;
-extern unsigned long lastTempRead;
-extern unsigned long lastMotionRead;
-extern unsigned long lastRespUpdate;
-extern unsigned long lastUpdate;
-
-// ========== ANIMATION STATE VARIABLES ==========
 extern int heartbeatFrame;
-extern int respFrame;
-extern int walkFrame;
-extern int scrollPos;
 extern unsigned long lastHeartbeatUpdate;
-extern unsigned long lastResUpdate;
-extern unsigned long lastWalkUpdate;
-extern unsigned long lastScroll;
-
-// ========== BUTTON STATE VARIABLES ==========
-extern bool buttonActive;
-extern bool longPressActive;
-extern unsigned long buttonPressTime;
 
 // ========== FUNCTION PROTOTYPES ==========
+// Power functions
 void powerOn();
 void powerOff();
 void activateSOS();
@@ -79,20 +30,7 @@ void drawPowerOnAnimation();
 void drawPowerOffAnimation();
 void drawPowerOffScreen();
 
-// Sensor functions (sensors.ino)
-void initSensors();
-void updateSensorData();
-void checkVitalAlerts();
-String getSensorStatus();
-void calibrateMPU6050();
-void readMotionData();
-void readHeartRateData();
-void estimateSpO2();
-void estimateBloodPressure(float bpm);
-void checkFallDetection(float accelMagnitude, float gyroX, float gyroY, float gyroZ);
-void estimateRespiratoryRate(float chestMovement);
-
-// Display functions (display.ino)
+// Display functions
 void drawLogoPage();
 void drawVitalsPage1();
 void drawVitalsPage2();
@@ -102,13 +40,18 @@ void drawAboutPage();
 void drawQRCodePage();
 void drawSOSScreen();
 
-// Button functions (buttons.ino)
+// Button functions
 void handleButton();
 
-// Sensor data function (replaces old simulated data)
-void updateSimulatedData(); 
+// Sensor functions
+void initSensors();
+void updateSensorData();
+void checkVitalAlerts();
+String getSensorStatus();
+void calibrateMPU6050();
+void handleSerialCommands();
 
-// ========== SETUP FUNCTION ==========
+// ========== SETUP ==========
 void setup() {
   Serial.begin(115200);
   
@@ -130,20 +73,19 @@ void setup() {
   
   // Initialize system
   powerOn();
-  pageTimer = millis();
-  lastActivityTime = millis();
   
   Serial.println("\n=== SYSTEM READY ===");
   Serial.println("Place finger on sensor for heart rate readings");
   Serial.println("Move device to count steps");
+  Serial.println("Type 'help' for serial commands");
   Serial.println("==========================================\n");
 }
 
-// ========== LOOP FUNCTION ==========
+// ========== LOOP ==========
 void loop() {
   unsigned long currentTime = millis();
   
-  // Handle button input (power on/off, SOS, page change)
+  // Handle button input
   handleButton();
   
   // Check power state
@@ -173,7 +115,7 @@ void loop() {
     }
   }
   
-  // Auto-advance pages every PAGE_DURATION seconds
+  // Auto-advance pages
   if (!sosActive && currentTime - pageTimer > PAGE_DURATION) {
     nextPage();
     pageTimer = currentTime;
@@ -185,7 +127,7 @@ void loop() {
     lastHeartbeatUpdate = currentTime;
   }
   
-  // Update display with current page
+  // Update display
   display.clearDisplay();
   
   if (sosActive) {
@@ -215,11 +157,11 @@ void loop() {
   
   display.display();
   
-  // Update REAL sensor data
-  updateSensorData();  
+  // Update sensor data
+  updateSensorData();
   
-  // Check for vital sign emergencies
-  checkVitalAlerts();
+  // Handle serial commands
+  handleSerialCommands();
   
   delay(50); 
 }

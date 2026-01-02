@@ -1,9 +1,29 @@
-// Button handling functions
+// // Button handling functions
+// #include "bitmaps.h"
+
+// bool buttonActive = false;
+// bool longPressActive = false;
+// unsigned long buttonPressTime = 0;
+
 #include "bitmaps.h"
 
-bool buttonActive = false;
-bool longPressActive = false;
-unsigned long buttonPressTime = 0;
+// Use extern for button variables
+extern bool buttonActive;
+extern bool longPressActive;
+extern unsigned long buttonPressTime;
+
+extern bool powerState;
+extern bool sosActive;
+extern PageState currentPage;
+extern unsigned long lastActivityTime;
+
+// Function prototypes
+void powerOn();
+void powerOff();
+void activateSOS();
+void deactivateSOS();
+void nextPage();
+
 
 // For double press detection
 #define DOUBLE_PRESS_TIME 300        

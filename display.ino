@@ -1,15 +1,33 @@
 // All display drawing functions
 #include "bitmaps.h"
+#include <Adafruit_SSD1306.h>
 
-// Animation state variables
-int heartbeatFrame = 0;
-int respFrame = 0;
-int walkFrame = 0;
-int scrollPos = 0;
-unsigned long lastHeartbeatUpdate = 0;
-unsigned long lastResUpdate = 0;
-unsigned long lastWalkUpdate = 0;
-unsigned long lastScroll = 0;
+extern Adafruit_SSD1306 display;
+
+// Use extern for all variables
+extern int heartbeatFrame;
+extern int respFrame;
+extern int walkFrame;
+extern int scrollPos;
+extern unsigned long lastHeartbeatUpdate;
+extern unsigned long lastResUpdate;
+extern unsigned long lastWalkUpdate;
+extern unsigned long lastScroll;
+
+extern bool sosActive;
+extern int heartRate;
+extern int bloodOxygen;
+extern float bodyTemperature;
+extern int bloodPressureSystolic;
+extern int bloodPressureDiastolic;
+extern int respiratoryRate;
+extern int sleepQuality;
+extern int stepsToday;
+extern int batteryLevel;
+extern int signalStrength;
+extern bool max30102Detected;
+extern bool bmp280Detected;
+extern bool mpu6050Detected;
 
 void drawLogoPage() {
   display.clearDisplay();

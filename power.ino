@@ -1,15 +1,29 @@
-// Power management functions
 #include "bitmaps.h"
+#include <Adafruit_SSD1306.h>
 
-// Global variables
-bool powerState = true;
-bool sosActive = false;
-bool showingLogo = true;
-PageState currentPage = PAGE_VITALS_1;
-unsigned long logoStartTime = 0;
-unsigned long pageTimer = 0;
-unsigned long sosStartTime = 0;
-unsigned long lastActivityTime = 0;
+extern Adafruit_SSD1306 display;
+
+// Use extern for all variables
+extern bool powerState;
+extern bool sosActive;
+extern bool showingLogo;
+extern PageState currentPage;
+extern unsigned long logoStartTime;
+extern unsigned long pageTimer;
+extern unsigned long sosStartTime;
+extern unsigned long lastActivityTime;
+
+extern int stepCount;
+extern int stepsToday;
+extern int heartRate;
+extern int bloodOxygen;
+extern bool mpu6050Detected;
+
+// Function prototypes
+void calibrateMPU6050();
+void drawPowerOnAnimation();
+void drawPowerOffAnimation();
+void drawPowerOffScreen();
 
 void powerOn() {
   powerState = true;

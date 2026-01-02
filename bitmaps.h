@@ -146,6 +146,24 @@ const unsigned char epd_bitmap_vitalgo_qrcode [] PROGMEM = {
 #define TEMP_READ_INTERVAL 5000  
 #define MOTION_READ_INTERVAL 100  
 
+// Fall detection thresholds for wearable
+#define FALL_IMPACT_THRESHOLD 18.0    
+#define FREE_FALL_THRESHOLD_LOW 10 
+#define FREE_FALL_THRESHOLD_HIGH 15
+#define MIN_FREE_FALL_TIME 300        
+#define POST_FALL_STILL_TIME 8000
+
+// Sensor thresholds and constants
+#define ACCEL_THRESHOLD 1.5
+#define STEP_DEBOUNCE 600
+#define FALL_STILLNESS_THRESHOLD 0.5
+#define RESP_RATE_MIN 8
+#define RESP_RATE_MAX 30
+
+// I2C speed constants
+#define I2C_SPEED_STANDARD 100000
+#define I2C_SPEED_FAST 400000
+
 // Page states enum
 enum PageState {
   PAGE_VITALS_1,
