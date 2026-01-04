@@ -25,7 +25,7 @@ float bodyTemperature = 36.5;
 float ambientTemperature = 25.0;
 int bloodPressureSystolic = 120;
 int bloodPressureDiastolic = 80;
-int respiratoryRate = 16;
+int respiratoryRate = 0;
 int sleepQuality = 85;
 int stepsToday = 4256;
 int batteryLevel = 85;
@@ -52,9 +52,12 @@ long irValue;
 
 // ========== TIMING VARIABLES ==========
 unsigned long lastHRRead = 0;
+unsigned long lastBPUpdate = 0;
+unsigned long lastRRUpdate = 0;
 unsigned long lastTempRead = 0;
 unsigned long lastMotionRead = 0;
 unsigned long lastSensorUpdate = 0;
+unsigned long lastMAX30102Read = 0;
 
 // ========== ANIMATION STATE ==========
 int heartbeatFrame = 0;

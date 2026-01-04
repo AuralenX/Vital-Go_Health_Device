@@ -25,18 +25,76 @@ void calibrateMPU6050();
 
 
 // Initialize all sensors
+// Initialize all sensors - CORRECTED VERSION
 void initSensors() {
   Serial.println("=== INITIALIZING SENSORS ===");
   
-  // Initialize I2C
+  // Initialize I2C at standard speed
   Wire.begin();
-  Wire.setClock(100000);
+  Wire.setClock(100000);  // Start with 100kHz for all devices
   delay(100);
   
-  // 1. Initialize BMP280
-  Serial.print("BMP280 at 0x");
-  Serial.print(0x76, HEX);
-  Serial.print(": ");
+  // Scan I2C bus first to see what's connected
+  Serial.println("Scanning I2C bus...");
+  for (byte address = 1; address < 127; address++) {
+    Wire.beginTransmission(address);
+    byte error = Wire.endTransmission();
+    
+    if (error == 0) {
+      Serial.print("Device found at 0x");
+      if (address < 16) Serial.print("0");
+      Serial.print(address, HEX);
+      
+      // Identify common devices
+      if (address == 0x3C || address == 0x30) Serial.print(" (OLED DISPLAY)");
+      if (address == 0x57 || address == 0x5A) Serial.print(" (MAX30102)");
+      if (address == 0x76 || address == 0x77) Serial.print(" (BMP280)");
+      if (address == 0x68 || address == 0x69) Serial.print(" (MPU6050)");
+      Serial.println();
+    }
+  }
+  Serial.println("Scan complete.");
+  delay(200);
+  
+  // 1. Initialize MAX30102 FIRST (most sensitive to I2C timing)
+  Serial.print("\nMAX30102: ");
+  max30102Detected = false;
+  
+  // Try both common addresses
+  if (!particleSensor.begin(Wire, 100000, 0x57)) {
+    Serial.print("0x57 failed, trying 0x5A... ");
+    if (!particleSensor.begin(Wire, 100000, 0x5A)) {
+      Serial.println("FAILED at both addresses");
+      max30102Detected = false;
+    } else {
+      Serial.println("Found at 0x5A!");
+      max30102Detected = true;
+    }
+  } else {
+    Serial.println("Found at 0x57!");
+    max30102Detected = true;
+  }
+  
+  if (max30102Detected) {
+    // Configure MAX30102 with proper settings
+    setupMAX30102();
+    delay(200);
+    
+    // Verify with a reading
+    long irTest = particleSensor.getIR();
+    Serial.print("  Initial IR reading: ");
+    Serial.println(irTest);
+    
+    if (irTest < 1000) {
+      Serial.println("  WARNING: Very low IR reading - check wiring!");
+    }
+  }
+  
+  // 2. Initialize BMP280
+  Serial.print("\nBMP280: ");
+  bmp280Detected = false;
+  
+  // Try primary address 0x76
   if (bmp.begin(0x76)) {
     bmp280Detected = true;
     bmp.setSampling(Adafruit_BMP280::MODE_NORMAL,
@@ -44,79 +102,55 @@ void initSensors() {
                     Adafruit_BMP280::SAMPLING_X16,
                     Adafruit_BMP280::FILTER_X16,
                     Adafruit_BMP280::STANDBY_MS_500);
-    Serial.println("OK");
-    Serial.print("  Temp: ");
-    Serial.print(bmp.readTemperature());
-    Serial.println("°C");
+    Serial.println("OK at 0x76");
   } else {
-    Serial.println("FAILED");
+    // Try alternative address 0x77
+    Serial.print("0x76 failed, trying 0x77... ");
+    if (bmp.begin(0x77)) {
+      bmp280Detected = true;
+      bmp.setSampling(Adafruit_BMP280::MODE_NORMAL,
+                      Adafruit_BMP280::SAMPLING_X2,
+                      Adafruit_BMP280::SAMPLING_X16,
+                      Adafruit_BMP280::FILTER_X16,
+                      Adafruit_BMP280::STANDBY_MS_500);
+      Serial.println("OK at 0x77");
+    } else {
+      Serial.println("FAILED at both addresses");
+    }
   }
-  delay(200);
   
-  // 2. Initialize MPU6050
-  Serial.print("MPU6050 at 0x");
-  Serial.print(MPU6050_ADDRESS, HEX);
-  Serial.print(": ");
-  Wire.beginTransmission(MPU6050_ADDRESS);
-  byte mpuError = Wire.endTransmission();
+  // 3. Initialize MPU6050
+  Serial.print("\nMPU6050: ");
+  mpu6050Detected = false;
   
-  if (mpuError == 0 && mpu.begin(MPU6050_ADDRESS)) {
+  if (mpu.begin(0x68)) {
     mpu6050Detected = true;
-    setupMPU6050(); 
     mpu.setAccelerometerRange(MPU6050_RANGE_2_G);
     mpu.setGyroRange(MPU6050_RANGE_250_DEG);
     mpu.setFilterBandwidth(MPU6050_BAND_21_HZ);
-    Serial.println("OK");
+    Serial.println("OK at 0x68");
   } else {
-    Serial.print("FAILED (error: ");
-    Serial.print(mpuError);
-    Serial.println(")");
-  }
-  delay(200);
-  
-  // 3. Initialize MAX30102
-  Serial.print("MAX30102 at 0x");
-  Serial.print(MAX30102_ADDRESS, HEX);
-  Serial.print(": ");
-  bool maxFound = false;
-  for (int attempt = 1; attempt <= 3; attempt++) {
-    if (particleSensor.begin(Wire, I2C_SPEED_STANDARD, MAX30102_ADDRESS)) {
-      maxFound = true;
-      break;
-    }
-    delay(100);
-  }
-  
-  if (maxFound) {
-    max30102Detected = true;
-    particleSensor.setup(0x1F, 4, 2, 100, 411, 4096);
-    particleSensor.setPulseAmplitudeRed(0x1F);
-    particleSensor.setPulseAmplitudeGreen(0);
-    Serial.println("OK");
-    
-    // Test IR sensor
-    long irTest = particleSensor.getIR();
-    Serial.print("  IR test: ");
-    Serial.println(irTest);
-  } else {
-    Serial.println("FAILED");
-    // Try alternative address
-    if (particleSensor.begin(Wire, I2C_SPEED_STANDARD, 0x5A)) {
-      max30102Detected = true;
-      Serial.println("  Found at 0x5A!");
+    Serial.print("0x68 failed, trying 0x69... ");
+    if (mpu.begin(0x69)) {
+      mpu6050Detected = true;
+      mpu.setAccelerometerRange(MPU6050_RANGE_2_G);
+      mpu.setGyroRange(MPU6050_RANGE_250_DEG);
+      mpu.setFilterBandwidth(MPU6050_BAND_21_HZ);
+      Serial.println("OK at 0x69");
+    } else {
+      Serial.println("FAILED at both addresses");
     }
   }
   
-  // Finalize
+  // Keep I2C at 100kHz for stability with multiple sensors
+  Wire.setClock(100000);
+  Serial.println("\nI2C speed set to 100kHz for multi-sensor stability");
+  
+  // Final status
   delay(500);
   printSensorStatus();
   
-  if (bmp280Detected || mpu6050Detected || max30102Detected) {
-    Wire.setClock(400000);
-    Serial.println("I2C speed: 400kHz");
-  }
-  
-  Serial.println("===========================\n");
+  Serial.println("=== SENSOR INITIALIZATION COMPLETE ===\n");
 }
 
 // Print sensor status

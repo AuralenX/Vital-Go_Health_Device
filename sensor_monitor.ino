@@ -18,6 +18,7 @@ extern int batteryLevel;
 extern int signalStrength;
 extern Adafruit_MPU6050 mpu;
 extern unsigned long lastSensorUpdate;
+extern unsigned long lastMAX30102Read;
 
 // Function declarations from other files
 void readBMP280Data();
@@ -35,11 +36,15 @@ void calibrateMPU6050();
 // Update all sensor data
 void updateSensorData() {
   unsigned long currentTime = millis();
+
+  if (currentTime - lastMAX30102Read >= MAX30102_INTERVAL) {
+    readMAX30102Data();
+    lastMAX30102Read = currentTime;
+  }
   
   if (currentTime - lastSensorUpdate >= DATA_UPDATE_INTERVAL) {
     readBMP280Data();
     readMPU6050Data();
-    readMAX30102Data();
     calculateDerivedVitals();
     checkVitalAlerts();
     lastSensorUpdate = currentTime;
@@ -57,7 +62,7 @@ void calculateDerivedVitals() {
     if (movementCount < 10) {
       sleepQuality = 90 - (movementCount * 2);
     } else {
-      sleepQuality = 70;
+      sleepQuality = 50;
     }
     
     movementCount = 0;

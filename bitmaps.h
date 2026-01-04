@@ -117,6 +117,7 @@ const unsigned char epd_bitmap_vitalgo_qrcode [] PROGMEM = {
 #define HEARTBEAT_INTERVAL 300
 #define POWER_OFF_TIMEOUT 30000
 #define DATA_UPDATE_INTERVAL 2000
+#define MAX30102_INTERVAL 100
 
 // Screen dimensions
 #define SCREEN_WIDTH 128
