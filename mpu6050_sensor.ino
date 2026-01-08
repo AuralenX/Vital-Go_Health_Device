@@ -17,21 +17,26 @@ extern unsigned long lastMotionRead;
 // Wrist-specific variables
 float wristCalibrationOffsetX = 0, wristCalibrationOffsetY = 0, wristCalibrationOffsetZ = 0;
 bool isCalibrated = false;
-unsigned long lastShakeTime = 0;
 
-// Step detection variables
-int stepBuffer[10];
-int stepBufferIndex = 0;
-float stepPatternConfidence = 0;
-unsigned long lastValidStepTime = 0;
+// Step detection (wrist-optimized)
+float prevStepSignal = 0;
+unsigned long lastStepDetectedTime = 0;
 
 // Fall detection variables
-bool potentialFallDetected = false;
 unsigned long fallDetectionStart = 0;
-float fallConfidence = 0;
 
 // Activity classification
 ActivityState currentActivity = ACTIVITY_IDLE;
+float lastAccelMagnitude = 0;
+
+
+// Activity smoothing
+float avgAccel = 0;
+float avgGyro = 0;
+
+// Sleep detection
+unsigned long stillnessCounter = 0;
+bool isSleeping = false;
 
 // Activity state to string conversion
 String activityToString(ActivityState activity) {
@@ -59,10 +64,6 @@ void setupMPU6050() {
   Serial.println("  Accel Range: ±4G");
   Serial.println("  Gyro Range: ±500°/s");
   Serial.println("  Filter: 21Hz");
-  
-  for (int i = 0; i < 10; i++) {
-    stepBuffer[i] = 0;
-  }
 }
 
 // ========== WRIST CALIBRATION ==========
@@ -138,118 +139,73 @@ void calibrateWristPosition() {
 
 // ========== MOTION PROCESSING ==========
 
-// Classify current activity
-ActivityState classifyActivity(float accelMagnitude, float gyroMagnitude) {
-  static unsigned long lastActivityUpdate = 0;
-  static float avgAccel = 0, avgGyro = 0;
-  static int sampleCount = 0;
-  
-  avgAccel = (avgAccel * sampleCount + accelMagnitude) / (sampleCount + 1);
-  avgGyro = (avgGyro * sampleCount + gyroMagnitude) / (sampleCount + 1);
-  sampleCount = min(sampleCount + 1, 20);
-  
-  if (millis() - lastActivityUpdate < 2000) {
-    return currentActivity;
-  }
-  
-  lastActivityUpdate = millis();
-  
-  if (avgAccel < 0.5 && avgGyro < 1.0) {
+// Classify current activity (simplified)
+ActivityState classifyActivity(float accelMag, float gyroMag) {
+  // Exponential smoothing
+  avgAccel = 0.8 * avgAccel + 0.2 * accelMag;
+  avgGyro  = 0.8 * avgGyro  + 0.2 * gyroMag;
+  Serial.print("Accel: ");
+  Serial.println(avgAccel);
+  Serial.print("Gyro: ");
+  Serial.println(avgGyro);
+
+  if (avgAccel < 10 && avgGyro < 15)
     return ACTIVITY_IDLE;
-  } else if (avgAccel > 2.0 && avgGyro > 3.0) {
-    return ACTIVITY_SHAKING;
-  } else if (avgAccel > 1.0 && avgGyro > 2.0 && avgAccel < 3.0) {
+
+  if (avgAccel < 20 && avgGyro < 25)
     return ACTIVITY_WALKING;
-  } else if (avgAccel > 3.0 && avgGyro > 4.0) {
+
+  if (avgAccel >= 20 || avgGyro >= 25)
     return ACTIVITY_RUNNING;
-  } else {
-    return ACTIVITY_UNKNOWN;
-  }
+
+  return ACTIVITY_UNKNOWN;
 }
 
-// Detect step using pattern recognition
-bool detectWristStep(float accelMagnitude, float gyroMagnitude, ActivityState activity) {
-  if (activity != ACTIVITY_WALKING && activity != ACTIVITY_RUNNING) {
-    return false;
-  }
-  
-  stepBuffer[stepBufferIndex] = (accelMagnitude > ACCEL_THRESHOLD) ? 1 : 0;
-  stepBufferIndex = (stepBufferIndex + 1) % 10;
-  
-  int patternScore = 0;
-  for (int i = 0; i < 8; i++) {
-    if (stepBuffer[i] != stepBuffer[i+1]) {
-      patternScore++;
+// Detect step using wrist swing pattern
+bool detectWristStep(float accelX, float accelY, float accelZ) {
+  // AC motion magnitude (gravity already removed)
+  float signal = sqrt(accelX*accelX + accelY*accelY + accelZ*accelZ);
+
+  float delta = signal - prevStepSignal;
+  prevStepSignal = signal;
+
+  // Wrist-appropriate thresholds
+  if (delta > 0.25 && signal > 0.6) {
+    if (millis() - lastStepDetectedTime > 350) { 
+      lastStepDetectedTime = millis();
+      return true;
     }
   }
-  
-  if (patternScore >= 5 && accelMagnitude > ACCEL_THRESHOLD) {
-    if (gyroMagnitude > 1.0) {
-      stepPatternConfidence = min(stepPatternConfidence + 0.2, 1.0);
-      
-      if (stepPatternConfidence > 0.6 && millis() - lastValidStepTime > STEP_DEBOUNCE) {
-        lastValidStepTime = millis();
-        return true;
-      }
-    }
-  } else {
-    stepPatternConfidence = max(stepPatternConfidence - 0.1, 0.0);
-  }
-  
   return false;
 }
 
-// Enhanced fall detection for wrist
-bool detectWristFall(float accelMagnitude, float gyroMagnitude, float gyroX, float gyroY, float gyroZ) {
-  static unsigned long lastFallCheck = 0;
-  
-  if (millis() - lastFallCheck < 100) {
-    return false;
+// Enhanced fall detection for wrist (simplified)
+bool detectWristFall(float accelMag, float gyroMag) {
+  static bool impactDetected = false;
+  static unsigned long impactTime = 0;
+
+  if (accelMag > 22.0 && gyroMag > 4.0) {
+    impactDetected = true;
+    impactTime = millis();
   }
-  lastFallCheck = millis();
-  
-  bool highImpact = accelMagnitude > FALL_IMPACT_THRESHOLD;
-  bool highRotation = gyroMagnitude > 4.0;
-  bool freeFall = accelMagnitude < FREE_FALL_THRESHOLD_HIGH && 
-                  accelMagnitude > FREE_FALL_THRESHOLD_LOW;
-  
-  static float lastOrientationZ = 0;
-  float orientationChange = abs(wristCalibrationOffsetZ - lastOrientationZ);
-  lastOrientationZ = wristCalibrationOffsetZ;
-  
-  if (highImpact && highRotation) {
-    fallConfidence += 0.4;
-  } else if (freeFall && highRotation) {
-    fallConfidence += 0.3;
-  } else if (orientationChange > 5.0 && highImpact) {
-    fallConfidence += 0.3;
-  } else {
-    fallConfidence = max(fallConfidence - 0.1, 0.0);
+
+  if (impactDetected && (millis() - impactTime < 800)) {
+    if (accelMag < 4.0) {  // post-fall stillness
+      impactDetected = false;
+      return true;
+    }
   }
-  
-  if (fallConfidence > 0.7 && !potentialFallDetected) {
-    potentialFallDetected = true;
-    fallDetectionStart = millis();
-    Serial.println("[MPU6050] POTENTIAL FALL DETECTED!");
-    Serial.print("  Impact: ");
-    Serial.print(accelMagnitude, 1);
-    Serial.print(" m/s², Rotation: ");
-    Serial.print(gyroMagnitude, 1);
-    Serial.println(" rad/s");
-    return true;
+
+  if (millis() - impactTime > 1500) {
+    impactDetected = false;
   }
-  
-  if (potentialFallDetected && millis() - fallDetectionStart > 5000) {
-    potentialFallDetected = false;
-    fallConfidence = 0;
-  }
-  
+
   return false;
 }
+
 
 // Check for post-fall stillness
 void checkPostFallStillness(float accelMagnitude, float gyroMagnitude) {
-  if (!potentialFallDetected) return;
   
   unsigned long fallDuration = millis() - fallDetectionStart;
   
@@ -262,20 +218,43 @@ void checkPostFallStillness(float accelMagnitude, float gyroMagnitude) {
         stillnessStart = millis();
       } else if (millis() - stillnessStart > POST_FALL_STILL_TIME) {
         Serial.println("[MPU6050] CONFIRMED FALL - User motionless!");
-        potentialFallDetected = false;
         stillnessStart = 0;
-        fallConfidence = 0;
+        if (!sosActive) {
+          activateSOS();
+        }
       }
     } else {
       Serial.println("[MPU6050] Fall alert canceled - movement detected");
-      potentialFallDetected = false;
-      fallConfidence = 0;
     }
   }
-  
-  if (fallDuration > 10000) {
-    potentialFallDetected = false;
-    fallConfidence = 0;
+}
+
+// Update sleep state based on prolonged stillness
+void updateSleepState(float accelMag, float gyroMag) {
+  if (!isBeingWorn()) {
+    stillnessCounter = 0;
+    isSleeping = false;
+    return;
+  }
+
+  if (accelMag < 0.15 && gyroMag < 0.2) {
+    stillnessCounter++;
+  } else {
+    stillnessCounter = 0;
+    isSleeping = false;
+  }
+
+  static unsigned long stillnessStart = 0;
+
+  if (accelMag < 0.15 && gyroMag < 0.2) {
+    if (stillnessStart == 0) stillnessStart = millis();
+    if (millis() - stillnessStart > 600000) { // 10 minutes
+      isSleeping = true;
+      Serial.println("[MPU6050] Sleep mode detected");
+    }
+  } else {
+    stillnessStart = 0;
+    isSleeping = false;
   }
 }
 
@@ -303,34 +282,40 @@ void readMPU6050Data() {
     
     float accelMagnitude = sqrt(accelX*accelX + accelY*accelY + accelZ*accelZ);
     float gyroMagnitude = sqrt(g.gyro.x*g.gyro.x + g.gyro.y*g.gyro.y + g.gyro.z*g.gyro.z);
+    lastAccelMagnitude = accelMagnitude;
     
     ActivityState newActivity = classifyActivity(accelMagnitude, gyroMagnitude);
     if (newActivity != currentActivity) {
       currentActivity = newActivity;
     }
     
-    if (detectWristStep(accelMagnitude, gyroMagnitude, currentActivity)) {
-      stepCount++;
-      stepsToday = stepCount;
-      lastStepTime = millis();
-      
-      static unsigned long lastStepLog = 0;
-      if (millis() - lastStepLog > 5000) {
-        Serial.print("[MPU6050] Step ");
-        Serial.print(stepCount);
-        Serial.print(" (Confidence: ");
-        Serial.print(stepPatternConfidence, 2);
-        Serial.print(", Activity: ");
-        Serial.print(activityToString(currentActivity));
-        Serial.println(")");
-        lastStepLog = millis();
+    // Step detection only during walking/running
+    if (currentActivity == ACTIVITY_WALKING ||
+        currentActivity == ACTIVITY_RUNNING) {
+      if (detectWristStep(accelX, accelY, accelZ)) {
+        stepCount++;
+        stepsToday = stepCount;
+        lastStepTime = millis();
+        
+        static unsigned long lastStepLog = 0;
+        if (millis() - lastStepLog > 5000) {
+          Serial.print("[MPU6050] Step ");
+          Serial.print(stepCount);
+          Serial.print(" (Activity: ");
+          Serial.print(activityToString(currentActivity));
+          Serial.println(")");
+          lastStepLog = millis();
+        }
       }
     }
-    
-    bool fallDetected = detectWristFall(accelMagnitude, gyroMagnitude, 
-                                        g.gyro.x, g.gyro.y, g.gyro.z);
+        
+    if (!sosActive && detectWristFall(accelMagnitude, gyroMagnitude)) {
+      activateSOS();
+    }
     
     checkPostFallStillness(accelMagnitude, gyroMagnitude);
+    
+    updateSleepState(accelMagnitude, gyroMagnitude);
     
     static unsigned long lastDebugOutput = 0;
     if (millis() - lastDebugOutput > 30000) {
@@ -338,6 +323,8 @@ void readMPU6050Data() {
       Serial.print(stepsToday);
       Serial.print(", Activity: ");
       Serial.print(activityToString(currentActivity));
+      Serial.print(", Sleep: ");
+      Serial.print(isSleeping ? "YES" : "NO");
       Serial.print(", Accel: ");
       Serial.print(accelMagnitude, 2);
       Serial.print(" m/s², Gyro: ");
@@ -352,16 +339,11 @@ void readMPU6050Data() {
 
 // Check if device is being worn
 bool isBeingWorn() {
-  if (!mpu6050Detected) return false;
-  
-  sensors_event_t a, g, temp;
-  mpu.getEvent(&a, &g, &temp);
-  
-  float accelMagnitude = sqrt(a.acceleration.x*a.acceleration.x + 
-                              a.acceleration.y*a.acceleration.y + 
-                              a.acceleration.z*a.acceleration.z);
-  
-  return (accelMagnitude > 8.5 && accelMagnitude < 10.5);
+  return (lastAccelMagnitude > 8.0 && lastAccelMagnitude < 11.0);
+}
+// Check sleep status
+bool isSleepingNow() {
+  return isSleeping;
 }
 
 // Get wear status as string
@@ -429,14 +411,14 @@ void printMPU6050Info() {
     Serial.println(stepsToday);
     Serial.print("  Current activity: ");
     Serial.println(activityToString(currentActivity));
-    Serial.print("  Step confidence: ");
-    Serial.println(stepPatternConfidence, 2);
-    Serial.print("  Fall confidence: ");
-    Serial.println(fallConfidence, 2);
     Serial.print("  Wear status: ");
     Serial.println(getWearStatus());
     Serial.print("  Calibrated: ");
     Serial.println(isCalibrated ? "YES" : "NO");
+    Serial.print("  Sleeping: ");
+    Serial.println(isSleeping ? "YES" : "NO");
+    Serial.print("  Stillness counter: ");
+    Serial.println(stillnessCounter);
     
     if (isCalibrated) {
       Serial.print("  Calibration offsets - X: ");

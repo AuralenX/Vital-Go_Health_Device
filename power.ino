@@ -154,12 +154,13 @@ void drawPowerOffScreen() {
 }
 
 void activateSOS() {
-   sosActive = true;
+  sosActive = true;
   sosStartTime = millis();
   lastActivityTime = millis();
   
   Serial.println("=== EMERGENCY SOS ACTIVATED ===");
   Serial.println("Sending alerts to caregivers...");
+  drawSOSScreen();
   
   // Log which sensors contributed to the alert
   Serial.print("Active sensors: ");

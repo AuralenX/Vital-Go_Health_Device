@@ -43,7 +43,7 @@ void updateSensorData() {
   }
   
   if (currentTime - lastSensorUpdate >= DATA_UPDATE_INTERVAL) {
-    readBMP280Data();
+    // readBMP280Data();
     readMPU6050Data();
     calculateDerivedVitals();
     checkVitalAlerts();
@@ -124,7 +124,7 @@ void checkVitalAlerts() {
   }
   
   // Temperature alerts
-  if (bmp280Detected && bodyTemperature > 0) {
+  if (max30102Detected && bodyTemperature > 0) {
     if (bodyTemperature > TEMP_FEVER) {
       criticalAlert = true;
       alertMessage = "FEVER: " + String(bodyTemperature, 1) + "°C";
@@ -155,7 +155,7 @@ void checkVitalAlerts() {
     Serial.print("[ALERT] ");
     Serial.println(alertMessage);
     // Uncomment if you have SOS functionality:
-    // if (!sosActive) activateSOS();
+    if (!sosActive) activateSOS();
   }
 }
 
@@ -168,9 +168,9 @@ void handleSerialCommands() {
     if (command == "status") {
       printSensorStatus();
     }
-    else if (command == "bmp280") {
-      printBMP280Info();
-    }
+    // else if (command == "bmp280") {
+    //   printBMP280Info();
+    // }
     else if (command == "mpu6050") {
       printMPU6050Info();
     }
@@ -234,7 +234,7 @@ void printAllSensorData() {
 void printHelp() {
   Serial.println("\n=== SERIAL COMMANDS ===");
   Serial.println("status    - Show sensor detection status");
-  Serial.println("bmp280    - Show BMP280 (temp/pressure) data");
+  // Serial.println("bmp280    - Show BMP280 (temp/pressure) data");
   Serial.println("mpu6050   - Show MPU6050 (motion) data");
   Serial.println("max30102  - Show MAX30102 (HR/SpO2) data");
   Serial.println("data      - Show all sensor readings");

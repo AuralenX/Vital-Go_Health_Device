@@ -16,6 +16,8 @@ extern int heartRate;
 extern int bloodOxygen;
 extern int bloodPressureSystolic;
 extern int bloodPressureDiastolic;
+extern float bodyTemperature;
+extern float ambientTemperature;
 extern unsigned long lastHRRead;
 extern unsigned long lastBPUpdate;
 extern unsigned long lastRRUpdate;
@@ -152,8 +154,8 @@ int calculateSimpleBPM(long irRaw) {
 
         // Smaller multiplier for peak, larger for rise
         if (avgDeriv > 0.00001f) { 
-            PEAK_THRESHOLD = -avgDeriv * 1.9f;  
-            RISE_THRESHOLD = avgDeriv * 0.8f;   
+            PEAK_THRESHOLD = -avgDeriv * 1.8f;  
+            RISE_THRESHOLD = avgDeriv * 0.6f;   
         }
 
         // Realistic limits for small signal
@@ -272,8 +274,12 @@ void readMAX30102Data() {
   while (particleSensor.available()) {
     long currentIR = particleSensor.getIR();
     long currentRed = particleSensor.getRed();
+    ambientTemperature = particleSensor.readTemperature();
     
     particleSensor.nextSample();
+
+    // ======== TEMPERATURE ESTIMATION =======
+    bodyTemperature = ambientTemperature + TEMPERATURE_OFFSET;
     
     samplesProcessed++;
     
@@ -362,7 +368,10 @@ void readMAX30102Data() {
       Serial.print(heartRate);
       Serial.print(" | SpO2: ");
       Serial.print(bloodOxygen);
-      Serial.println("%");
+      Serial.print("%");
+      Serial.print(" | Temperature: ");
+      Serial.print(bodyTemperature);
+      Serial.println("°C");
       lastDebug = currentTime;
     }
     
@@ -620,6 +629,7 @@ void resetMAX30102Data() {
   lastValidBPM = 0;
   lastBeatDetected = 0;
   respPPGIndex = 0;
+  bodyTemperature = 28;
   
   for (int i = 0; i < 4; i++) {
     rates[i] = 0;

@@ -112,7 +112,7 @@ const unsigned char epd_bitmap_vitalgo_qrcode [] PROGMEM = {
 #define VERY_LONG_PRESS_TIME 5000
 
 // Timing constants
-#define PAGE_DURATION 7000
+#define PAGE_DURATION 5000
 #define LOGO_DURATION 8000
 #define HEARTBEAT_INTERVAL 300
 #define POWER_OFF_TIMEOUT 30000
@@ -130,7 +130,7 @@ const unsigned char epd_bitmap_vitalgo_qrcode [] PROGMEM = {
 #define MAX30102_ADDRESS 0x57
 
 // Sensor calibration values
-#define TEMPERATURE_OFFSET -2.0  
+#define TEMPERATURE_OFFSET 1.0  
 #define HR_CALIBRATION_FACTOR 1.05  
 
 // Vital sign thresholds
